@@ -19,8 +19,6 @@ provisionProcess(Registration registration) async{
   assert(registration.registrationStatus == RegistrationStatus.Registered);
 
 
-
-
 }
 
 _retriveSpecification(){}

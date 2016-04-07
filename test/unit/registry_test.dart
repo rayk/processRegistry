@@ -52,7 +52,7 @@ main() {
     ];
 
     test('Should always return same instance of registry.', () async {
-      Registry testRegistry = new Registry(register: toBeRegistered);
+      Registry testRegistry = new Registry(processes: toBeRegistered);
       expect(testRegistry, isNotNull);
       Registry testRegistry2 = new Registry();
       expect(testRegistry == testRegistry2, isTrue);
@@ -68,20 +68,20 @@ main() {
       expect(pros.length, equals(toBeRegistered.length));
     });
 
-    test("Should show that two processes failed to register", () {
+    test("Should show that two processes failed to register.", () {
       var registry = new Registry();
       List<Map> regPro = registry.requestedRegistration;
       var fails = regPro.where((e) => (e.containsValue(RequestStatus.failed)));
       expect(fails.length, equals(2));
     });
 
-    test("Should a list of registration objects", () {
+    test("Should return a list of registration objects.", () {
       var registry = new Registry();
       List<Registration> registrations = registry.registrations;
       expect(registrations.length, equals(5));
     });
 
-    test("Should access public attributes in retrieved  Registration Object.",
+    test("Should access public attributes in retrieved Registration Object.",
         () {
       var registry = new Registry();
       var results = registry.registrations.where((r) => r.name == "Echo");

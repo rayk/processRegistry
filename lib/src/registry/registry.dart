@@ -51,10 +51,10 @@ class Registry {
   /// can pass in the optional list of processes that you would like to register.
   ///
   /// Flipping the debugger flag just enable the Observatory Profiler.
-  factory Registry({List<List<String>> register, bool debugger: false}) {
+  factory Registry({List<List<String>> processes, bool debugger: false}) {
     if (_instance == null) {
-      assert(register.isNotEmpty);
-      _instance = new Registry._internal(register);
+      assert(processes.isNotEmpty);
+      _instance = new Registry._internal(processes);
     }
     return _instance;
   }
