@@ -1,40 +1,40 @@
 library echoProcess;
 
 import 'package:processRegistry/process_lib.dart';
-import 'dart:isolate';
+
 
 main(List args, message) {
-  assert(args[0] is SendPort);
 
+  /// Standard process configuration function every process needs to implement.
   configureProcess(
-      new EchoProcess(args, message), 'EchoProcess', new Version(0, 1, 0),
-      canProcessBeMonitored: true,
-      canProcessBroadcastResponses: false,
-      canProcessConnectToLogging: true,
-      canProcessPartitionRequest: false,
-      canProcessReceiveOnGoingRequest: true,
-      canProcessRecoverAfterFailure: true,
-      canProcessResponseToRequest: true,
-      canProcessShareIsolate: false,
-      canProcessSpawn: false,
-      canProcessTakeInitialArgs: true,
-      canProcessTerminatesOnFailure: false,
-      canProcessUseReplyToPorts: true);
+      new EchoProcess(), 'EchoProcess', new Version(0, 1, 0), args, message,
+      supportResourceSaving: false,
+      supportResponseStreaming: true,
+      supportsAutoShutdownOnFailures: false,
+      supportsBroadcasting: false,
+      supportsFailureRecovery: true,
+      supportsLogging: true,
+      supportsMonitoring: true,
+      supportsMultiRequesterChannel: false,
+      supportsReplyPortsInMessages: true,
+      supportsRequestStreaming: true,
+      supportsStartupConfig: true,
+      supportsSubProcesses: false);
 }
 
+/// The namespace which encapsulates the process.
 class EchoProcess extends Object with ProcessMixin {
-  List initialArgs;
-  var initialMessage;
 
-  EchoProcess(args, message) {
-    initialArgs = args;
-    initialMessage = message;
-  }
+  EchoProcess() {}
 
-  startProcess(ReceivePort incomingRequest, List startupArgs){
+  /// Called after the configuration has been applied, once call all incoming
+  /// request need to be handled by the process.
+  startProcess(Map startup){
     incomingRequest.listen((Map request){
 
     });
   }
 
+
 }
+

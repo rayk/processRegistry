@@ -7,70 +7,34 @@ import 'package:uuid/uuid.dart';
 
 export 'package:pub_semver/pub_semver.dart' show Version;
 
-/// Used as base of processes.
+part 'process_config.dart';
+
+
+/// Used as base of every process and handle all the low level management
+/// of the process.
 abstract class ProcessMixin {
-  final ReceivePort _primaryReceivePort = new ReceivePort();
-  Map _processConfiguration;
-  List<ReceivePort> _requesterRequest;
-  List<SendPort> _requesterResponse;
+  Map  startupConfiguration;
+  ReceivePort incomingRequest;
+  SendPort outgoingResponses;
+  SendPort logEntry;
+  String processName;
+  String versionNumber;
+  DateTime processCreated;
+  DateTime lastRequest;
+  int requestCounter;
+  int responseCounter;
 
-  List get initialArgs => initialArgs;
+  /// Make the configuration setting for the process. This Method is called
+  /// automatically once the registry dependencies are in place.
+  _applyConfiguration(Map processConfigurationSettings){
 
-  startProcess(ReceivePort incomingRequest, List startupArgs);
+  }
+
+
+  /// Starts the process so that it delivery it's outcome.
+  startProcess(Map Startup);
 }
 
-/// Passes the specification of the service back to the registry.
-_publishSpecification(ProcessMixin process, Map _registryConfig) {
-  SendPort tempProvisionPort = process.initialArgs[0];
-  tempProvisionPort.send(_registryConfig);
-}
-
-/// Creates a specification mapping describing how the process should be
-/// configured in term of ports and low level behaviour.
-configureProcess(ProcessMixin process, String processName, Version version,
-    {bool canProcessBroadcastResponses: false, // Process responses by broadcast.
-    bool canProcessBeMonitored: true, //
-    bool canProcessConnectToLogging: true, // Can send logging to a passed in sendPort.
-    bool canProcessPartitionRequest: false, // Uses a
-    bool canProcessReceiveOnGoingRequest: true, // Listens to the receive port.
-    bool canProcessRecoverAfterFailure: true, // Try to restart after exit.
-    bool canProcessResponseToRequest: true, // Will reply if you give it a send port.
-    bool canProcessShareIsolate: false,
-    bool canProcessSpawn: false, // Can have it's own sub-processes.
-    bool canProcessHaveMultipleInstance: false, // Can run multi instances of service.
-    bool canProcessTakeInitialArgs: false, // Can be configurated
-    bool canProcessTerminatesOnFailure: true,
-    bool canProcessUseReplyToPorts: true}) {
-  var uuid = new Uuid();
 
 
-  Map processConfig = {
-    proConfigKeys.CreateBroadCastStream: canProcessBroadcastResponses,
-    proConfigKeys.DefaultProcessSendPort: canProcessResponseToRequest,
-    proConfigKeys.ExtractProcessArgs: canProcessTakeInitialArgs,
-    proConfigKeys.LinkToLogService: canProcessConnectToLogging,
-    proConfigKeys.ReplyOnRequestSendPort: canProcessUseReplyToPorts,
-    proConfigKeys.RequiresRegister: canProcessSpawn,
-    proConfigKeys.SetPerConsumerReceivePorts: canProcessPartitionRequest,
-    proConfigKeys.UniqueIdentifier: canProcessShareIsolate
-        ? uuid.v4().toString().substring(0, 7)
-        : Isolate.current.hashCode,
-  };
 
-  Map registryConfig = {
-    proConfigKeys.DefaultProcessSendPort: canProcessResponseToRequest,
-    proConfigKeys.ExclusiveIsolate: !canProcessShareIsolate,
-    proConfigKeys.FailOnUnCaughtExceptions: canProcessTerminatesOnFailure,
-    proConfigKeys.Id: processConfig[proConfigKeys.UniqueIdentifier],
-    proConfigKeys.LinkToLogService: canProcessConnectToLogging,
-    proConfigKeys.Name: processName,
-    proConfigKeys.MultiInstances: canProcessHaveMultipleInstance,
-    proConfigKeys.PortExchange: canProcessReceiveOnGoingRequest,
-    proConfigKeys.RecoverFailedProcess: canProcessRecoverAfterFailure,
-    proConfigKeys.SetOnErrorPort: canProcessBeMonitored,
-    proConfigKeys.SetPerConsumerReceivePorts: canProcessPartitionRequest,
-    proConfigKeys.Version: version.toString(),
-  };
-
-  _publishSpecification(process, registryConfig);
-}

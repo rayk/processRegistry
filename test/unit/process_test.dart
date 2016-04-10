@@ -8,34 +8,35 @@ import 'dart:isolate';
 main() {
   ReceivePort testRecPort = new ReceivePort();
 
-  List args = [testRecPort.sendPort];
+  Map provision = {regProvisionValues.Debug: false, regProvisionValues.SendPort: testRecPort.sendPort};
+  List args = [provision, 'anotherItem', 'moreItems'];
   var message = "Message";
 
   group("Remote Process:", () {
 
-    test("Should return a process specification.", () async {
+    test("Should return a process specification to registry.", () async {
       testRecPort.listen(expectAsync((Map spec) {
         expect(spec is Map, isTrue);
-        expect(spec[proConfigKeys.DefaultProcessSendPort], isTrue,
+        expect(spec[configKey.DefaultProcessSendPort], isTrue,
             reason: 'No sign to keep using port.');
-        expect(spec[proConfigKeys.ExclusiveIsolate], isTrue,
+        expect(spec[configKey.CollectibleIsolate], isTrue,
             reason: 'No it need a fulltime execlusive.');
-        expect(spec[proConfigKeys.FailOnUnCaughtExceptions], isFalse,
+        expect(spec[configKey.FailOnUnCaughtExceptions], isFalse,
             reason: 'Set on Ioolate confriguration');
-        expect(spec[proConfigKeys.Id], isNotNull,
+        expect(spec[configKey.UniqueIdentifier], isNotNull,
             reason: 'Id required for tracking');
-        expect(spec[proConfigKeys.LinkToLogService], isTrue,
+        expect(spec[configKey.LinkToLogService], isTrue,
             reason: 'Does it need a loging service');
-        expect(spec[proConfigKeys.Name], equals('EchoProcess'));
-        expect(spec[proConfigKeys.PortExchange], isTrue,
+        expect(spec[configKey.Name], equals('EchoProcess'));
+        expect(spec[configKey.PortExchange], isTrue,
             reason: 'Does it need a port exchange done');
-        expect(spec[proConfigKeys.RecoverFailedProcess], isTrue,
+        expect(spec[configKey.RestartOnFail], isTrue,
             reason: 'Listen for exists and restart?');
-        expect(spec[proConfigKeys.SetOnErrorPort], isTrue,
+        expect(spec[configKey.SetIsolateListeners], isTrue,
             reason: 'Monitor for errors');
-        expect(spec[proConfigKeys.SetPerConsumerReceivePorts], isFalse,
+        expect(spec[configKey.SetPerConsumerReceivePorts], isFalse,
             reason: "Aggragated will be fine");
-        expect(spec[proConfigKeys.Version], equals("0.1.0"),
+        expect(spec[configKey.Version], equals("0.1.0"),
             reason: "The version of the process it thinks");
       }, count: 1));
 
@@ -45,31 +46,28 @@ main() {
 }
 
 startupFunction(List arg, message) {
-  configureProcess(
-      new TestService(arg, message), 'EchoProcess', new Version(0, 1, 0),
-      canProcessBeMonitored: true,
-      canProcessBroadcastResponses: false,
-      canProcessConnectToLogging: true,
-      canProcessPartitionRequest: false,
-      canProcessReceiveOnGoingRequest: true,
-      canProcessRecoverAfterFailure: true,
-      canProcessResponseToRequest: true,
-      canProcessShareIsolate: false,
-      canProcessSpawn: false,
-      canProcessTakeInitialArgs: true,
-      canProcessTerminatesOnFailure: false,
-      canProcessUseReplyToPorts: true);
+  configureProcess(new MockService(), 'EchoProcess', new Version(0, 1, 0), arg, message,
+      supportsMonitoring: true,
+      supportsBroadcasting: false,
+      supportsLogging: true,
+      supportsMultiRequesterChannel: false,
+      supportsRequestStreaming: true,
+      supportsFailureRecovery: true,
+      supportResponseStreaming: true,
+      supportResourceSaving: false,
+      supportsSubProcesses: false,
+      supportsStartupConfig: true,
+      supportsAutoShutdownOnFailures: false,
+      supportsReplyPortsInMessages: true);
 }
 
-class TestService extends Object with ProcessMixin {
+class MockService extends Object with ProcessMixin {
   List initialArgs;
   var initialMessage;
 
-  TestService(args, message) {
-    initialArgs = args;
-    initialMessage = message;
+  MockService() {
   }
 
-  startProcess(ReceivePort incomingRequest, List startupArgs) =>
+  startProcess(Map startup) =>
       incomingRequest.listen((Map request) {});
 }
