@@ -1,48 +1,70 @@
 part of process;
 
-/// Lookup for Configuration Actions.
-Map<configKey, ConfigurationAction> configActionsLookup = {
-  configKey.CollectibleIsolate: registrySetShutDowns,
-  configKey.CreateBroadCastStream: setupBroadcastStream,
-  configKey.DefaultProcessSendPort: portExchange,
-  configKey.ExtractProcessArgs: processStartupConfig,
-  configKey.FailOnUnCaughtExceptions: registryIsolateSetFail,
-  configKey.LinkToLogService: registrySetLogService,
-  configKey.MultiInstances: registrySetMultiInstance,
-  configKey.MultipleReceivePorts: multiPortController,
-  configKey.PortExchange: portExchange,
-  configKey.ProcessListens: portExchange,
-  configKey.RequestReplyToPortUsable: processSetReplyToUsable,
-  configKey.RequiresRegister: setupOwnRegistry,
-  configKey.RestartOnFail: registryRecoverFailure,
-  configKey.SetIsolateListeners: registrySetErrorPortMonitoring,
-  configKey.SetPerConsumerReceivePorts: multiPortController,
+/// Given a Process Configuration Value as a Key and return function to output
+/// the required parts of the specification.
+Map<PCv, Function> specificationParts = {
+  PCv.collectibleIsolate: registryParts,
+  PCv.communalReceivePort: portParts,
+  PCv.createBroadCastStream: portParts,
+  PCv.extractProcessArgs: processParts,
+  PCv.failOnUnCaughtExceptions: isolateParts,
+  PCv.instance: isolateParts,
+  PCv.lazyLoad: registryParts,
+  PCv.linkToLogService: registryParts,
+  PCv.multiInstances: registryParts,
+  PCv.name: processParts,
+  PCv.portExchange: portParts,
+  PCv.processListens: isolateParts,
+  PCv.requestReplyToPortUsable: processParts,
+  PCv.requiresRegister: registryParts,
+  PCv.restartOnFail: isolateParts,
+  PCv.setIsolateListeners: isolateParts,
+  PCv.spawnArgumentsMap: processParts,
+  PCv.uniqueIdentifier: processParts,
+  PCv.version: processParts,
 };
 
+/// Builds the specification by taking the developer process configurations and
+/// details and mapping them into  executable functions which is then provided
+/// provision function.
+List<Map> buildSpecification(Map configuration) {
+  Map requestedSpec = new Map.unmodifiable(configuration);
+  List result = new List();
+
+  /// Picks all the closures related to the Process Configuration Values given.
+  List<Function> specParts = new List();
+  for (var key in requestedSpec.keys) {
+    specParts.add(specificationParts[key](requestedSpec));
+  }
+  assert(requestedSpec.keys.length == specParts.length);
+
+  /// Makes a Registry Entry Map based on the PRe enum
+  Map registryEntry = new Map();
+  List _exeList1 = new List();
+  for (Function part in specParts) {
+    if (!_exeList1.contains(part)) {
+      PRe.values.forEach((e) => part(e, registryEntry));
+      _exeList1.add(part);
+    }
+  }
+  assert(registryEntry.keys.length == PRe.values.length);
+  result.add(registryEntry);
+
+  Map provisionTask = new Map();
+  List _exeList2 = new List();
+  for (Function part in specParts) {
+    if (!_exeList2.contains(part)) {
+      PTi.values.forEach((e) => part(e, provisionTask));
+      _exeList2.add(part);
+    }
+  }
+  assert(provisionTask.keys.length == PTi.values.length);
+  result.add(provisionTask);
+
+  return result;
+}
+
 /// Creates a specification mapping describing how the process should be
-/// configured in term of ports and low level behaviour. This is the first thing executed
-/// when a service it attempted to be provisioned.
-///
-/// The default values are set for a anonymous process that accepts a start configuration
-/// responses always on the same channel. Can be monitored and needs restarting when if falls over.
-///
-/// ### Configuration Options for Processes.
-/// - supportAnonymousRequester, Process does not need to identify the requester.
-/// - supportAutoShutDownOnFailure, Process stops and shutdown on errors and exceptions.
-/// - supportBroadcasting, Process will  broadcast to all requester listening in.
-/// - supportFailureRecovery, Registry will attempt to restart process if it crashes.
-/// - supportLogging, Registry will a provide process with SendPort of Logger.
-/// - supportMonitoring, Registry will attach Listeners and log issues.
-/// - supportMultipleInstancePerRegistry, Process can be launched a number of time in the same registry.
-/// - supportMultiRequesterChanel, Process can operate a number of SendPorts against it's one receive port.
-/// - supportPerRequesterPrivateChannel, Process can handle many receive ports, each with their own SendPort.
-/// - supportRequestStreaming, Process is continually listening for request.
-/// - supportResourceSaving, Process can be shutdown by registry to save resources.
-/// - supportResponseStreaming, Process returns a continuous stream of results.
-/// - supportsReplyPortsInMessage, Process can use a reply to a request using a SendPort included in the request.
-/// - supportStartupConfig, Process accepts a configuration when it's being launched.
-/// - supportSubProcesses, Process requires it own Registry so it can have sub processes.
-///
 /// ### Configuration Examples.
 /// - Single Use Process, returns only once takes not inputs.
 ///  - supportRequestStreaming = false,
@@ -57,227 +79,126 @@ Map<configKey, ConfigurationAction> configActionsLookup = {
 ///   - supportRequestStreaming = true,
 ///   - supportResponseStreaming = true,
 ///
-configureProcess(ProcessMixin process, String processName, Version version,
+configureProcess(ProcessMixin process, String processName, String version,
     List args, String message,
-    {bool supportsMonitoring: true, // Provide support for monitoring of errors.
-    bool supportsBroadcasting:
-        false, // Broadcast process with no assured delivery.
-    bool supportsLogging: true, // Can send logging to a passed in sendPort.
-    bool supportsAnonymousRequester:
-        true, // No formal registration of the requester is required.
-    bool supportsMultipleInstancePerRegistry:
-        false, // Can run multi instances of process run in the same registry.
-    bool supportsRequestStreaming:
-        true, // Does the Process continually listens to a stream.
-    bool supportsFailureRecovery: true, // Try to restart after exit.
-    bool supportResponseStreaming:
-        true, // Request to the process always results in a response.
-    bool supportResourceSaving:
-        false, // Can the process automatically be shutdown to save resources.
-    bool supportsSubProcesses: false, // Can spawn it's own sub-processes.
-    bool supportsStartupConfig:
-        true, // Can the process access an Startup Configuration.
-    bool supportsAutoShutdownOnFailures:
-        true, // If there is a unhandled failure this process self terminates.
-    bool supportsMultiRequesterChannel: true, // Many sendPorts will be created.
-    bool supportPerRequesterPrivateChanel:
-        false, // One ReceivePort per requester.
-    bool supportsReplyPortsInMessages: true}) {
-  /// There always needs to be a send port back to the requester.
-  /// Passed in with the args when the Isolate is created.
-  assert(args[0] is Map);
-
-  var uuid = new Uuid();
-
-  Map<configKey, bool> _processConfiguration = new Map.from({
-    configKey.CollectibleIsolate: supportResourceSaving,
-    configKey.CreateBroadCastStream: supportsBroadcasting,
-    configKey.ExtractProcessArgs: supportsStartupConfig,
-    configKey.FailOnUnCaughtExceptions: supportsAutoShutdownOnFailures,
-    configKey.LinkToLogService: supportsLogging,
-    configKey.MultiInstances: supportsMultipleInstancePerRegistry,
-    configKey.MultipleReceivePorts: supportPerRequesterPrivateChanel,
-    configKey.PortExchange: supportResponseStreaming,
-    configKey.ProcessListens: supportsRequestStreaming,
-    configKey.RequestReplyToPortUsable: supportsReplyPortsInMessages,
-    configKey.RequiresRegister: supportsSubProcesses,
-    configKey.RestartOnFail: supportsFailureRecovery,
-    configKey.SetIsolateListeners: supportsMonitoring,
-    configKey.SetPerConsumerReceivePorts: supportsMultiRequesterChannel,
+    {bool supportAnonymousRequester: true, // Requester does not have register.
+    bool supportAutoShutdownOnFailure: false, // Uncaught Exceptions Fatal.
+    bool supportBroadcasting: false, // Response on a Broadcast Stream.
+    bool supportFailureRecovery: true, // Restart if process dies.
+    bool supportLazyLoad: false, // First actual request causes load.
+    bool supportLogging: true, // Requires a logging send port.
+    bool supportMonitoring: true, // Attach a listeners
+    bool supportMultipleInstancePerRegistry: true, // Many Instance
+    bool supportCommunalRequesterChannel: true, // Process has 1 receive port.
+    bool supportRequestStreaming: true, // Request via stream or one off future.
+    bool supportResourceSaving: true, // Collect Isolate to free resources.
+    bool supportResponseStreaming: true, // Responses via stream else future.
+    bool supportReplyPortsInMessage: true, // Embedded SendPorts Usable.
+    bool supportStartupConfig: true, // Run config before processing messages.
+    bool supportSubProcess: false}) {
+  /// Process Configuration Values.
+  Map _processConfiguration = new Map.from({
+    PCv.collectibleIsolate: supportResourceSaving,
+    PCv.communalReceivePort: supportCommunalRequesterChannel,
+    PCv.createBroadCastStream: supportBroadcasting,
+    PCv.extractProcessArgs: supportStartupConfig,
+    PCv.failOnUnCaughtExceptions: supportAutoShutdownOnFailure,
+    PCv.lazyLoad: supportLazyLoad,
+    PCv.linkToLogService: supportLogging,
+    PCv.multiInstances: supportMultipleInstancePerRegistry,
+    PCv.portExchange: supportResponseStreaming,
+    PCv.processListens: supportRequestStreaming,
+    PCv.requestReplyToPortUsable: supportReplyPortsInMessage,
+    PCv.requiresRegister: supportSubProcess,
+    PCv.restartOnFail: supportFailureRecovery,
+    PCv.setIsolateListeners: supportMonitoring,
+    PCv.spawnArgumentsMap: extractSpawnArguments(args, message),
+    PCv.instance: process,
+    PCv.name: processName,
+    PCv.uniqueIdentifier: new Uuid().v4().toString().substring(0, 7),
+    PCv.version: version.toString(),
   });
 
-  Map _tempProvValues = new Map.from(args[0]);
+  /// All Keys specified assertion.
+  assert(_processConfiguration.length == PCv.values.length);
+  List main = buildSpecification(_processConfiguration);
 
-  Map _processDetails = new Map.from({
-    configKey.InitialArgs: new List.unmodifiable([args, message]),
-    configKey.Instance: process,
-    configKey.Name: processName,
-    configKey.UniqueIdentifier: uuid.v4().toString().substring(0, 7),
-    configKey.Version: version.toString(),
-    configKey.TempExchangeSendPort:
-        _tempProvValues[regProvisionValues.SendPort],
-    configKey.DebuggerMode: _tempProvValues[regProvisionValues.Debug],
-  });
-
-  implementConfiguration(_processDetails, _processConfiguration);
+  process._activateWithSpecification(main);
 }
 
-/// Builds a configuration map for the registry and for the process.
-/// Returns the registry via the SendPort provided in the Args and Listens
-/// to for response from the registry.
-///
-/// It then passes that response along with the configuration map for the
-/// process into startup process.
-void implementConfiguration(
-    Map configDetails, Map<configKey, bool> configSwitch) {
-  Map regValues = new Map(); // Values for the registry.
-  Map cesValues = new Map(); // Values for the process.
-
-  configSwitch.forEach((K, V) {
-    if (V == true) {
-      ConfigValueApplicator applyConfig =
-          configActionsLookup[K](configDetails, configSwitch);
-      applyConfig(cesValues, regValues);
-    }
-  });
-
-  /// Provide details as to how to setup this process in the registry.
-  if (regValues.isNotEmpty) {
-    cesValues[processSetValue.ExchangeOnPort].send(regValues);
-    cesValues[processSetValue.MainReceivePort]
-        .listen((Map processDependencies) {
-      configDetails[configKey.Instance]._applyConfiguration();
-    });
-  }
+/// Map the Arguments passed during the spawn of this process.
+Map extractSpawnArguments(List args, String message) {
+  assert(args[0] is SendPort);
+  Map spawningArguments = {
+    PSa.debug: args[1] is bool ? args[1] : false,
+    PSa.entryPoint: args[2] is List ? args[2] : throw new ArgumentError(''),
+    PSa.message: message,
+    PSa.sendPort: args[0],
+    PSa.startupArgs: args[3],
+    PSa.lazyRequest: args[4],
+    PSa.specNotRequired: args[5],
+  };
+  return spawningArguments;
 }
 
-ConfigValueApplicator multiPortController(Map configDetails, Map configSwitches) {}
-
-/// Provide the Registry with a the sendPort side of the port the process
-/// will be listening to.
-ConfigValueApplicator portExchange(Map configDetails, Map configSwitches) {
-  SendPort _tempExchangePort = configDetails[configKey.TempExchangeSendPort];
-  ReceivePort _processMainReceivePort = new ReceivePort();
-  SendPort _sendToExchangeWithRegistry = _processMainReceivePort.sendPort;
-
-  void config(Map process, Map registry) {
-    registry[regSetValue.ProcessDefaultSendPort] = _sendToExchangeWithRegistry;
-    process[processSetValue.MainReceivePort] = _processMainReceivePort;
-    process[processSetValue.ExchangeOnPort] = _tempExchangePort;
-  }
-
-  return config;
+/// Used the process configuration in the ProcessMixin
+/// Developers configuration of the process.
+enum PCv {
+  // Process Configuration Values - Boolean switches for major Isolation and Port behaviour.
+  collectibleIsolate, //
+  communalReceivePort, //
+  createBroadCastStream, // Process has a broadcast stream
+  extractProcessArgs, //
+  failOnUnCaughtExceptions, // Config Isolate to fail on exceptions
+  instance, // Actual instance of the Process.
+  lazyLoad, // Wait until there are actual request for the process before allocating.
+  linkToLogService, // Pass on SendPort to the logging service.
+  multiInstances, // Can have multiple instance of this process.
+  name, // Process Name
+  portExchange, // Get a sendPort from the process.
+  processListens, //
+  requestReplyToPortUsable, // If the request has a send port use for the response.
+  requiresRegister, // Process requires registry for it's own processes.
+  restartOnFail, // Automatic restart the process on failure.
+  setIsolateListeners, // Set the registry OnError to listen for problems.
+  spawnArgumentsMap,
+  uniqueIdentifier, // Uniquely identifies the process.
+  version, // Process version.
 }
 
-/// If there is a send port in request message send your response to it.
-ConfigValueApplicator processSetReplyToUsable(Map configDetails, Map configSwitches) {
-  bool _includedSendPortUse = configSwitches[configKey.RestartOnFail];
-
-  void config(Map process, Map registry) {
-    process[processSetValue.ReplyOnEnclosedSendPort] = _includedSendPortUse;
-  }
-  return config;
+/// Process Registry Entry.
+enum PRe {
+  communalSendPort, // All register go down the one send port.
+  id, // Absolute Identification number of the process.
+  idleShutdown, // can this process be shutdown recover resources if it not used.
+  isolate, // The isolate id that the process is running on.
+  lazyLoad, // Can we wait until a it is need before loading the process.
+  monitored, // Does the registry listen process management ports.
+  name, // Name of the process.
+  pathList, // List of the path the entry point.
+  recover, // Does the Registry attempt to recover the process if it fails.
+  startArgs, // The Args used in the startup of the process
+  unique, // Can there only be one of this type of process in the registry.
+  version, // The Version reported in code.
 }
 
-/// Extract out the startup args and message for the process if they exist.
-/// Otherwise init the startup list to be a empty list.
-ConfigValueApplicator processStartupConfig(Map configDetails, Map configSwitches) {
-  List _passedInArgs = configDetails[configKey.InitialArgs];
-  List _startupArgsList = [];
-  String _startupMsg;
-  var target = configDetails[configKey.Instance];
-
-  /// If there is arg list and message
-  if (_passedInArgs.length == 2) {
-    _startupMsg = _passedInArgs[1];
-  }
-
-  /// If the Args list has something in position 1 that is a startup list.
-  if (_passedInArgs[0].length == 2) {
-    _startupArgsList = _passedInArgs[1] ?? new List.unmodifiable([]);
-  }
-
-  void config(Map process, Map registry) {
-    target.startupConfiguration = {
-      processStartup.ArgsList: _startupArgsList,
-      processStartup.Message: _startupMsg
-    };
-  }
-  return config;
+/// Process Spawning Argument.
+enum PSa {
+  // Process Spawning Arguments passed during the spawn.
+  debug, // Boolean indicating should be debug mode.
+  entryPoint, // List of the entry point path used to execute this process.
+  lazyRequest, // Don't start the service just for this request.
+  message, // String containing and registry messages.
+  sendPort, // The requester is listening to the other end of this.
+  startupArgs, // Args for the actual process to used at startup or configuration.
+  specNotRequired, // When true we process to turn up assuming they already have a spec.
 }
 
-ConfigValueApplicator registryIsolateSetFail(Map configDetails, Map configSwitches) {
-  bool _fails = configSwitches[configKey.FailOnUnCaughtExceptions];
-
-  void config(Map process, Map registry) {
-    registry[regSetValue.ErrorsAreFatal] = _fails;
-  }
-
-  return config;
+/// Provision Task Items.
+enum PTi {
+  exchangePort, // Establish two communication ports
+  loggingServiceExpected, // Don't complete provisioning until a logging port is received.
+  broadCastStream, // Create a broadcast stream.
+  processRegistry, // Create a Registry in this Isolate.
+  portRequestHandling, // Be prepared to for each requester to have own send/receive port.
 }
-
-ConfigValueApplicator registryRecoverFailure(Map configDetails, Map configSwitches) {
-  bool _recover = configSwitches[configKey.RestartOnFail];
-
-  void config(Map process, Map registry) {
-    registry[regSetValue.AutoRestartOnFail] = _recover;
-  }
-
-  return config;
-}
-
-/// Registry need to listen to and process the OnError port of the isolate.
-ConfigValueApplicator registrySetErrorPortMonitoring(Map configDetails, Map configSwitches) {
-  bool _value = configSwitches[configKey.SetIsolateListeners];
-
-  void config(Map process, Map registry) {
-    registry[regSetValue.MonitorOnErrorPort] = _value;
-  }
-
-  return config;
-}
-
-/// Registry needs to provide a logging service.
-ConfigValueApplicator registrySetLogService(Map configDetails, Map configSwitches) {
-  bool _logServiceNeeded = configSwitches[configKey.LinkToLogService];
-
-  void config(Map process, Map registry) {
-    registry[regSetValue.ProvideLogService] = _logServiceNeeded;
-  }
-
-  return config;
-}
-
-/// Informs the register that multiple instances of this process is ok.
-ConfigValueApplicator registrySetMultiInstance(Map configDetails, Map configSwitches) {
-  bool _multiInstance = configSwitches[configKey.MultiInstances];
-
-  config(Map process, Map registry) {
-    registry[regSetValue.MultiInstanceAllowed] = _multiInstance;
-  }
-
-  return config;
-}
-
-/// Let registry know that process can be shutdown for resource saving
-/// When there is not port exchange, attempt immediate shutdown.
-ConfigValueApplicator registrySetShutDowns(Map configDetails, Map configSwitches) {
-  bool _afterUse = configSwitches[configKey.PortExchange] ? false : true;
-
-  config(Map process, Map registry) {
-    registry[regSetValue.ShutDownIdleIsolate] = true;
-    registry[regSetValue.AttemptShutDownAfterUse] = _afterUse;
-  }
-
-  return config;
-}
-
-ConfigValueApplicator setupBroadcastStream(Map configDetails, Map configSwitches) {}
-
-ConfigValueApplicator setupOwnRegistry(Map configDetails, Map configSwitches) {}
-
-/// Configuration Action Type.
-typedef void ConfigValueApplicator(
-    Map processConfiguration, Map registryConfiguration);
-typedef ConfigValueApplicator ConfigurationAction(
-    Map configDetails, Map configSwitches);

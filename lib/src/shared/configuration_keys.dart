@@ -1,30 +1,6 @@
 library sharedConfigurationKeys;
 
-/// Used the process configuration in the ProcessMixin
-enum configKey {
-  CollectibleIsolate, //
-  CreateBroadCastStream, // Process has a broadcast stream
-  DebuggerMode, // Propagation of debug true/false from register.
-  DefaultProcessSendPort, //
-  ExtractProcessArgs, //
-  FailOnUnCaughtExceptions,  // Config Isolate to fail on exceptions
-  InitialArgs,
-  Instance, // Actual instance of the Process.
-  LinkToLogService, // Pass on SendPort to the logging service.
-  MultiInstances, // Can have multiple instance of this process.
-  MultipleReceivePorts, // Need to handle multiple receive ports.
-  Name, // Process Name
-  PortExchange, // Get a sendPort from the process.
-  ProcessListens, //
-  RequestReplyToPortUsable, // If the request has a send port use for the response.
-  RequiresRegister, // Process requires registry for it's own processes.
-  RestartOnFail, // Automatic restart the process on failure.
-  SetIsolateListeners, // Set the registry OnError to listen for problems.
-  SetPerConsumerReceivePorts, //
-  TempExchangeSendPort, // The Temp Send Port provided by the registry.
-  UniqueIdentifier, // Uniquely identifies the process.
-  Version, // Process version.
-}
+
 
 /// Used to indicate the startup of the process.
 enum processStartup{
@@ -38,16 +14,25 @@ enum processManagement{
   AttemptEarlyCollection, // Attempt to collect after first use.
 }
 
-enum regSetValue {
-  ShutDownIdleIsolate,
+/// Registry Registration Values
+enum RRv {
   AttemptShutDownAfterUse,
-  MonitorOnErrorPort,
-  ProcessRegistry,
-  ErrorsAreFatal,
   AutoRestartOnFail,
-  ProvideLogService,
+  EntryPointUri,
+  ErrorsAreFatal,
+  LazyLoadable,
+  MonitorOnErrorPort,
   MultiInstanceAllowed,
   ProcessDefaultSendPort,
+  ProcessId,
+  ProcessName,
+  ProcessRegistry,
+  ProcessVersion,
+  ProvideLogService,
+  ProvisionedIsolate,
+  ProvisionStatus,
+  RegistrarReceivePort,
+  ShutDownIdleIsolate,
 }
 
 enum processSetValue{
@@ -57,7 +42,8 @@ enum processSetValue{
   ReplyOnEnclosedSendPort, // Process should use the send point in the message.
 }
 
-enum regProvisionValues{
+enum specRequest{
   Debug, // Debug value Propagation
   SendPort, // Send provide by register for port exchange.
+  EntryPoint, // Uri of the Entry of the process.
 }

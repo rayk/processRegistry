@@ -1,12 +1,12 @@
 part of registry;
 
 /// Returns a URI for a path package down.
-Uri toUri(List pathString) {
-  var ctx = new path.Context();
-  List parts = new List()
+Uri toUri(List<String> pathString) {
+  path.Context ctx = new path.Context();
+  List<String> parts = new List()
     ..add(ctx.current)
     ..addAll(pathString);
-  String completePath = ctx.joinAll(parts);
+ String completePath = ctx.joinAll(parts);
   if (path.extension(completePath) == null) {
     return new Uri.directory(completePath);
   } else {
@@ -15,10 +15,9 @@ Uri toUri(List pathString) {
 }
 
 
-
 /// Verifies the file in the URI actually exist.
 Future<bool> isFileAccessible(Uri file) async {
-  var testFile = new File.fromUri(file);
+  FileSystemEntity testFile = new File.fromUri(file);
   return await testFile.exists();
 }
 

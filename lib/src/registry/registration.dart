@@ -1,4 +1,5 @@
 part of registry;
+
 /// The process operating status describes the condition of the underlying process
 /// which the [Registration] represents.
 enum ProcessOpStatus {
@@ -11,80 +12,105 @@ enum ProcessOpStatus {
   /// The process has been used before, currently offline, calling it should bring it back online.
   Offline,
   /// The process is currently available to receive request.
-  Online, }
+  Online,
+}
 
 typedef void ProcessAccessFunction(Map request);
 
-/// The registration is the reference to the underlying process.
+/// Provides access to underlying process and various specification and data.
 class Registration {
-  DateTime _registered;
-  List _provisionEvents;
-  Map _specification;
-  ProcessOpStatus _processOperatingState;
-  ReceivePort _primaryReceivePort;
-  RegistrationStatus _registrationState;
-  String _name;
-  Uri _processEntryPoint;
-  Version _internal_version;
+  String _name, _id;
+  Version _ver;
+  Uri _entryPoint;
+  DateTime _created;
+  RequestStatus _status;
+  RegistrationStatus _regStatus;
+  Isolate _currentIsolate;
+  ReceivePort _currentReceivePort;
+  SendPort _currentSendPort;
+  bool _attempShutdownAfterUse,
+      _autoRestartOnFail,
+      _fatalError,
+      _lazyLoad,
+      _monitorErrorPort,
+      _multiInstances,
+      _idleShutDown,
+      _requiresLogService;
+  StreamController streamCtl = new StreamController();
+  Stream _registryStream;
 
 
-  /// Using this constructor will by pass the file existent check. This
-  /// simply increases the odds of crashing when you attempt to kick off the
-  /// entry_point for the process.
-  ///
-  /// All other integrity of the registration is maintained if you do used
-  /// this constructor.
-  Registration(this._name, String _version, this._processEntryPoint,
-      this._registrationState) {
-    _processOperatingState = ProcessOpStatus.NeverStarted;
-    _registered = new DateTime.now();
+  bool get isFullyManaged=> _autoRestartOnFail && _monitorErrorPort ? true : false;
+  bool get isMultiInstancesAllowed => _multiInstances;
+  String get name =>_name;
+  String get Id =>_id;
+  RegistrationStatus get registrationStatus => _regStatus;
+  Uri get pathToEntryPoint => _entryPoint;
+  Version get version =>_ver;
 
-    if (_registrationState != RegistrationStatus.FailedPath) {
-      try {
-        _internal_version = new Version.parse(_version);
-        _primaryReceivePort = new ReceivePort();
-      } catch (e) {
-        _registrationState = RegistrationStatus.FailedVersion;
-      }
-    }
+
+  /// The registration needs configuration now.
+  Registration(Map specification){
+    loadSpecification(specification);
+    _currentIsolate = specification[regSetValue.ProvisionedIsolate];
+    _currentReceivePort = specification[regSetValue.RegistrarReceivePort];
+
+    assert(_currentReceivePort != null);
+    assert(_currentSendPort != null);
   }
 
-  /// Called when you want to use the process associated with the
-  /// particular registration.
-  Future<Function>useProcess(String consumer, ReceivePort defaultPort)async{
-
-
+  /// The registration is Lazy and can wait for a request before allocating resource.
+  Registration.Lazy(Map specification){
+    loadSpecification(specification);
+    _lazyLoad = specification[regSetValue.LazyLoadable];
   }
 
-  /// Returns the common name for the process
-  String get name => _name;
-  /// Returns the operating status of the process represented by this registration.
-  ProcessOpStatus get operatingStatus => _processOperatingState;
-  /// The path where the source code is located for this process.
-  Uri get pathToEntryPoint => _processEntryPoint;
-  /// The Date and Time the Registration was created.
-  DateTime get registrationDateTime => _registered;
-  /// The Status the actual registration, provides information as failed registration reasons.
-  RegistrationStatus get registrationStatus => _registrationState;
-  /// Returns the semantic version number of the process.
-  Version get version => _internal_version;
+  _updateRegistry(List inform)=> streamCtl.add(inform);
 
-  @override
-  toString() {
-    StringBuffer sb = new StringBuffer("Registration Object");
-    sb.writeln('Name: ${name}');
-    sb.writeln('Version: ${_internal_version.toString()}');
-    sb.writeln('Entry Point: ${_processEntryPoint.toString()}');
-    sb.writeln('Reg State $_registrationState');
-    sb.writeln('Operational State $_processOperatingState');
+  /// Sets the standards attributions.
+  loadSpecification(Map specification){
+    _autoRestartOnFail = specification[regSetValue.AutoRestartOnFail];
+    _created = new DateTime.now();
+    _currentSendPort = specification[regSetValue.ProcessDefaultSendPort];
+    _entryPoint = specification[regSetValue.EntryPointUri];
+    _fatalError = specification[regSetValue.ErrorsAreFatal];
+    _id = specification[regSetValue.ProcessId];
+    _monitorErrorPort = specification[regSetValue.MonitorOnErrorPort];
+    _multiInstances = specification[regSetValue.MultiInstanceAllowed];
+    _name = specification[regSetValue.ProcessName];
+    _requiresLogService = specification[regSetValue.ProvideLogService];
+    _ver = new Version.parse(specification[regSetValue.ProcessVersion]);
   }
+
+  /// Rejects the registration and closes down and resources.
+  void _reject(){
+    _currentIsolate?.kill();
+    _currentReceivePort?.close();
+    _regStatus = RegistrationStatus.Failed;
+    streamCtl.close();
+  }
+
+  Stream _accept(){
+    return _registryStream = streamCtl.stream;
+}
 }
 
-/// Indicates the status of the registration.
+/// Indicates the status of the process registration.
 enum RegistrationStatus {
-  /// Failed to be registered because the path to the entry point source was not reachable.
+  /// The process is be setup and will be available soon.
+  Configuring,
+  /// Failed to be registered because the path to the entry
+  /// point source was not reachable.
   FailedPath,
-  /// Failed to be registered because the format of the version number was not semantically compliant.
+  /// Failed to be registered because the format of the
+  /// version number was not semantically compatible;
   FailedVersion,
-  /// Has been successfully registered and can used.
-  Registered, }
+  /// Has been successfully registered and is available for use.
+  Available,
+  /// There has been a failure in execution, no attempt
+  /// is being made to recover this process.
+  Failed,
+  /// Failed during operations and is being recovered,
+  /// should be available soon;
+  Recovery
+}

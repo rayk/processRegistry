@@ -1,13 +1,19 @@
 library process;
 
 import 'dart:isolate';
+import 'package:quiver/strings.dart';
+import 'package:quiver/collection.dart';
+import 'dart:developer';
 import 'package:pub_semver/pub_semver.dart';
+import 'dart:async';
 import 'package:processRegistry/src/shared/configuration_keys.dart';
 import 'package:uuid/uuid.dart';
 
 export 'package:pub_semver/pub_semver.dart' show Version;
 
 part 'process_config.dart';
+part 'config_applicator.dart';
+part 'isolate_operations.dart';
 
 
 /// Used as base of every process and handle all the low level management
@@ -24,15 +30,14 @@ abstract class ProcessMixin {
   int requestCounter;
   int responseCounter;
 
-  /// Make the configuration setting for the process. This Method is called
-  /// automatically once the registry dependencies are in place.
-  _applyConfiguration(Map processConfigurationSettings){
+  _activateWithSpecification(List specification){
 
   }
 
+  _establishChannel(){
 
-  /// Starts the process so that it delivery it's outcome.
-  startProcess(Map Startup);
+  }
+
 }
 
 
